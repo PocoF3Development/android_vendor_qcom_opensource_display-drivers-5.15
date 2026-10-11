@@ -1,0 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-only
+ccflags-y += -I$(srctree)/drivers/clk/qcom -I$(DISPLAY_ROOT)/alioth-pll
+obj-m += msm_alioth_dsi_pll.o
+msm_alioth_dsi_pll-y := pll_drv.o pll_util.o dsi_pll_7nm.o

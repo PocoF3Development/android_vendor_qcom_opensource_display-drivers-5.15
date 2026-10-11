@@ -13,8 +13,6 @@
 #include <linux/iopoll.h>
 #include "pll_drv.h"
 #include "dsi_pll.h"
-#include "dp_pll.h"
-#include "hdmi_pll.h"
 
 int mdss_pll_resource_enable(struct mdss_pll_resources *pll_res, bool enable)
 {
@@ -67,8 +65,7 @@ static int mdss_pll_resource_init(struct platform_device *pdev,
 	int rc = 0;
 	struct dss_module_power *mp = &pll_res->mp;
 
-	rc = msm_dss_config_vreg(&pdev->dev,
-				mp->vreg_config, mp->num_vreg, 1);
+	rc = msm_dss_get_vreg(&pdev->dev, mp->vreg_config, mp->num_vreg, 1);
 	if (rc) {
 		pr_err("Vreg config failed rc=%d\n", rc);
 		goto vreg_err;
@@ -83,7 +80,7 @@ static int mdss_pll_resource_init(struct platform_device *pdev,
 	return rc;
 
 clk_err:
-	msm_dss_config_vreg(&pdev->dev, mp->vreg_config, mp->num_vreg, 0);
+	msm_dss_get_vreg(&pdev->dev, mp->vreg_config, mp->num_vreg, 0);
 vreg_err:
 	return rc;
 }
@@ -94,8 +91,8 @@ static void mdss_pll_resource_deinit(struct platform_device *pdev,
 	struct dss_module_power *mp = &pll_res->mp;
 
 	msm_dss_put_clk(mp->clk_config, mp->num_clk);
+	msm_dss_get_vreg(&pdev->dev, mp->vreg_config, mp->num_vreg, 0);
 
-	msm_dss_config_vreg(&pdev->dev, mp->vreg_config, mp->num_vreg, 0);
 }
 
 static void mdss_pll_resource_release(struct platform_device *pdev,
@@ -126,30 +123,12 @@ static int mdss_pll_resource_parse(struct platform_device *pdev,
 		goto err;
 	}
 
-	if (!strcmp(compatible_stream, "qcom,mdss_dsi_pll_10nm"))
-		pll_res->pll_interface_type = MDSS_DSI_PLL_10NM;
-	if (!strcmp(compatible_stream, "qcom,mdss_dp_pll_10nm"))
-		pll_res->pll_interface_type = MDSS_DP_PLL_10NM;
-	else if (!strcmp(compatible_stream, "qcom,mdss_dp_pll_7nm"))
-		pll_res->pll_interface_type = MDSS_DP_PLL_7NM;
-	else if (!strcmp(compatible_stream, "qcom,mdss_dp_pll_7nm_v2"))
-		pll_res->pll_interface_type = MDSS_DP_PLL_7NM_V2;
-	else if (!strcmp(compatible_stream, "qcom,mdss_dsi_pll_7nm"))
-		pll_res->pll_interface_type = MDSS_DSI_PLL_7NM;
-	else if (!strcmp(compatible_stream, "qcom,mdss_dsi_pll_7nm_v2"))
-		pll_res->pll_interface_type = MDSS_DSI_PLL_7NM_V2;
-	else if (!strcmp(compatible_stream, "qcom,mdss_dsi_pll_7nm_v4_1"))
+	if (!strcmp(compatible_stream, "qcom,mdss_dsi_pll_7nm_v4_1"))
 		pll_res->pll_interface_type = MDSS_DSI_PLL_7NM_V4_1;
-	else if (!strcmp(compatible_stream, "qcom,mdss_dsi_pll_28lpm"))
-		pll_res->pll_interface_type = MDSS_DSI_PLL_28LPM;
-	else if (!strcmp(compatible_stream, "qcom,mdss_dsi_pll_14nm"))
-		pll_res->pll_interface_type = MDSS_DSI_PLL_14NM;
-	else if (!strcmp(compatible_stream, "qcom,mdss_dp_pll_14nm"))
-		pll_res->pll_interface_type = MDSS_DP_PLL_14NM;
-	else if (!strcmp(compatible_stream, "qcom,mdss_hdmi_pll_28lpm"))
-		pll_res->pll_interface_type = MDSS_HDMI_PLL_28LPM;
-	else
+	else {
+		rc = -ENODEV;
 		goto err;
+	}
 
 	return rc;
 
@@ -163,39 +142,9 @@ static int mdss_pll_clock_register(struct platform_device *pdev,
 {
 	int rc;
 
-	switch (pll_res->pll_interface_type) {
-	case MDSS_DSI_PLL_10NM:
-		rc = dsi_pll_clock_register_10nm(pdev, pll_res);
-		break;
-	case MDSS_DP_PLL_10NM:
-		rc = dp_pll_clock_register_10nm(pdev, pll_res);
-		break;
-	case MDSS_DSI_PLL_7NM:
-	case MDSS_DSI_PLL_7NM_V2:
-	case MDSS_DSI_PLL_7NM_V4_1:
-		rc = dsi_pll_clock_register_7nm(pdev, pll_res);
-		break;
-	case MDSS_DP_PLL_7NM:
-	case MDSS_DP_PLL_7NM_V2:
-		rc = dp_pll_clock_register_7nm(pdev, pll_res);
-		break;
-	case MDSS_DSI_PLL_28LPM:
-		rc = dsi_pll_clock_register_28lpm(pdev, pll_res);
-		break;
-	case MDSS_DSI_PLL_14NM:
-		rc = dsi_pll_clock_register_14nm(pdev, pll_res);
-		break;
-	case MDSS_DP_PLL_14NM:
-		rc = dp_pll_clock_register_14nm(pdev, pll_res);
-		break;
-	case MDSS_HDMI_PLL_28LPM:
-		rc = hdmi_pll_clock_register_28lpm(pdev, pll_res);
-		break;
-	case MDSS_UNKNOWN_PLL:
-	default:
-		rc = -EINVAL;
-		break;
-	}
+	if (pll_res->pll_interface_type != MDSS_DSI_PLL_7NM_V4_1)
+		return -ENODEV;
+	rc = dsi_pll_clock_register_7nm(pdev, pll_res);
 
 	if (rc)
 		pr_err("Pll ndx=%d clock register failed rc=%d\n",
@@ -386,20 +335,10 @@ static int mdss_pll_remove(struct platform_device *pdev)
 }
 
 static const struct of_device_id mdss_pll_dt_match[] = {
-	{.compatible = "qcom,mdss_dsi_pll_10nm"},
-	{.compatible = "qcom,mdss_dp_pll_10nm"},
-	{.compatible = "qcom,mdss_dsi_pll_7nm"},
-	{.compatible = "qcom,mdss_dsi_pll_7nm_v2"},
-	{.compatible = "qcom,mdss_dsi_pll_7nm_v4_1"},
-	{.compatible = "qcom,mdss_dp_pll_7nm"},
-	{.compatible = "qcom,mdss_dp_pll_7nm_v2"},
-	{.compatible = "qcom,mdss_dsi_pll_28lpm"},
-	{.compatible = "qcom,mdss_dsi_pll_14nm"},
-	{.compatible = "qcom,mdss_dp_pll_14nm"},
+	{ .compatible = "qcom,mdss_dsi_pll_7nm_v4_1" },
 	{},
 };
-
-MODULE_DEVICE_TABLE(of, mdss_clock_dt_match);
+MODULE_DEVICE_TABLE(of, mdss_pll_dt_match);
 
 static struct platform_driver mdss_pll_driver = {
 	.probe = mdss_pll_probe,

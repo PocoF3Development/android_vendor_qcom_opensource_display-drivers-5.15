@@ -444,8 +444,12 @@ static int dsi_phy_driver_probe(struct platform_device *pdev)
 		goto fail_settings;
 	}
 
-	rc = dsi_catalog_phy_pll_setup(&dsi_phy->hw,
-			dsi_phy->pll->pll_revision);
+	if (of_property_read_bool(pdev->dev.of_node,
+			"qcom,external-pll"))
+		rc = 0;
+	else
+		rc = dsi_catalog_phy_pll_setup(&dsi_phy->hw,
+				dsi_phy->pll->pll_revision);
 	if (rc) {
 		DSI_PHY_ERR(dsi_phy, "Catalog does not support PLL version (%d)\n",
 		       dsi_phy->pll->pll_revision);

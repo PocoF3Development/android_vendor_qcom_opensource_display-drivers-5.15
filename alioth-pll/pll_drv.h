@@ -15,11 +15,7 @@
 #include "clk-regmap-divider.h"
 #include "clk-regmap-mux.h"
 
-#if defined(CONFIG_DRM)
 #include <linux/sde_io_util.h>
-#else
-#include <linux/mdss_io_util.h>
-#endif
 
 #define MDSS_PLL_REG_W(base, offset, data)	\
 				writel_relaxed((data), (base) + (offset))
