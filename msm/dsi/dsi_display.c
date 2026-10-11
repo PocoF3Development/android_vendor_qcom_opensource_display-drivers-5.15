@@ -1,3 +1,4 @@
+#include "dsi_alioth_notifier.h"
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2021-2025 Qualcomm Technologies, Inc. and/or its subsidiaries.
@@ -1343,6 +1344,13 @@ int dsi_display_set_power(struct drm_connector *connector,
 		return -EINVAL;
 	}
 
+	if (power_mode == SDE_MODE_DPMS_LP1 ||
+	    power_mode == SDE_MODE_DPMS_LP2 ||
+	    (power_mode == SDE_MODE_DPMS_ON &&
+	     (display->panel->power_mode == SDE_MODE_DPMS_LP1 ||
+	      display->panel->power_mode == SDE_MODE_DPMS_LP2)))
+		dsi_alioth_notify(display, MI_DRM_EARLY_EVENT_BLANK, power_mode);
+
 	switch (power_mode) {
 	case SDE_MODE_DPMS_LP1:
 		rc = dsi_panel_set_lp1(display->panel);
@@ -1364,8 +1372,10 @@ int dsi_display_set_power(struct drm_connector *connector,
 	DSI_DEBUG("Power mode transition from %d to %d %s",
 			display->panel->power_mode, power_mode,
 			rc ? "failed" : "successful");
-	if (!rc)
+	if (!rc) {
 		display->panel->power_mode = power_mode;
+		dsi_alioth_notify(display, MI_DRM_EVENT_BLANK, power_mode);
+	}
 
 	return rc;
 }

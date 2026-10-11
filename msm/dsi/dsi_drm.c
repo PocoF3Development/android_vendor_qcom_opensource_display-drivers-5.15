@@ -1,3 +1,4 @@
+#include "dsi_alioth_notifier.h"
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
@@ -212,6 +213,8 @@ static void dsi_bridge_pre_enable(struct drm_bridge *bridge)
 		return;
 	}
 
+	dsi_alioth_notify(c_bridge->display, MI_DRM_EARLY_EVENT_BLANK,
+			SDE_MODE_DPMS_ON);
 	SDE_ATRACE_BEGIN("dsi_display_prepare");
 	rc = dsi_display_prepare(c_bridge->display);
 	if (rc) {
@@ -229,6 +232,9 @@ static void dsi_bridge_pre_enable(struct drm_bridge *bridge)
 				c_bridge->id, rc);
 		(void)dsi_display_unprepare(c_bridge->display);
 	}
+	if (!rc)
+		dsi_alioth_notify(c_bridge->display, MI_DRM_EVENT_BLANK,
+				SDE_MODE_DPMS_ON);
 	SDE_ATRACE_END("dsi_display_enable");
 
 	rc = dsi_display_splash_res_cleanup(c_bridge->display);
@@ -303,6 +309,8 @@ static void dsi_bridge_disable(struct drm_bridge *bridge)
 		sde_connector_helper_bridge_disable(display->drm_conn);
 	}
 
+	dsi_alioth_notify(c_bridge->display, MI_DRM_PRE_EVENT_BLANK,
+			SDE_MODE_DPMS_OFF);
 	rc = dsi_display_pre_disable(c_bridge->display);
 	if (rc) {
 		DSI_ERR("[%d] DSI display pre disable failed, rc=%d\n",
@@ -330,6 +338,8 @@ static void dsi_bridge_post_disable(struct drm_bridge *bridge)
 
 	SDE_ATRACE_BEGIN("dsi_bridge_post_disable");
 	SDE_ATRACE_BEGIN("dsi_display_disable");
+	dsi_alioth_notify(display, MI_DRM_EARLY_EVENT_BLANK,
+			SDE_MODE_DPMS_OFF);
 	rc = dsi_display_disable(display);
 	if (rc) {
 		DSI_ERR("[%d] DSI display disable failed, rc=%d\n",
